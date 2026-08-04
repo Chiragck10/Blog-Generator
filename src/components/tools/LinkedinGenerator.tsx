@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Linkedin, Copy, Check, RotateCcw } from "lucide-react";
+import { useGenerate } from "@/lib/useGenerate";
 import type { ComposerState } from "@/components/dashboard/Dashboard";
 
 interface LinkedinGeneratorProps {
@@ -34,8 +35,8 @@ export default function LinkedinGenerator({ composerState, onBack }: LinkedinGen
   const [tone, setTone] = useState("Professional");
   const [audience, setAudience] = useState("Business Professionals");
   const [generatedContent, setGeneratedContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { generate, isGenerating, error } = useGenerate();
 
   useEffect(() => {
     if (composerState) {
@@ -45,40 +46,35 @@ export default function LinkedinGenerator({ composerState, onBack }: LinkedinGen
     }
   }, [composerState]);
 
-  const generateContent = () => {
+  const generateContent = async () => {
     if (!topic.trim()) return;
 
-    setIsGenerating(true);
     setGeneratedContent("");
 
-    setTimeout(() => {
-      const content = `I've been thinking a lot about ${topic.toLowerCase()} lately, and here's what I've learned:
+    const systemPrompt = `You are a LinkedIn content strategist and ghostwriter. Create engaging LinkedIn posts that:
+- Hook the reader in the first line
+- Use short paragraphs and line breaks for readability
+- Include a personal angle or storytelling element
+- End with a call-to-action or question to drive engagement
+- Add relevant hashtags at the end (3-5 hashtags)
+- Keep it between 150-300 words (LinkedIn sweet spot)
+- Write in a ${tone.toLowerCase()} tone
+- Target ${audience.toLowerCase()}
 
-After years of experience in this space, I can confidently say that success comes down to three things:
+Do NOT use markdown formatting. Write in plain text with line breaks. Use emojis sparingly if appropriate.`;
 
-1. Consistency over perfection
-You don't need to have all the answers. Show up, contribute, and iterate. The best results come from steady progress, not overnight breakthroughs.
+    const prompt = `Write an engaging LinkedIn post about: "${topic}"
 
-2. Building genuine connections
-The people who thrive aren't just networking — they're creating real value for others. Ask yourself: "How can I help?" before "What can I gain?"
+Requirements:
+- Tone: ${tone}
+- Target Audience: ${audience}
+- Make it thought-provoking and shareable
+- Include a strong hook and call-to-action`;
 
-3. Staying curious
-The moment you think you know everything is the moment you stop growing. The best professionals I know are perpetual learners.
-
-Here's what I'd challenge you to do this week:
-- Pick one area where you've been playing it safe
-- Take one small, bold step forward
-- Share what you learned (yes, even the failures)
-
-The ${audience.toLowerCase()} who embrace this mindset are the ones shaping our industry's future.
-
-What's your take? I'd love to hear your perspective in the comments.
-
-#${topic.replace(/\s+/g, "")} #ProfessionalGrowth #Leadership #CareerDevelopment`;
-
-      setGeneratedContent(content);
-      setIsGenerating(false);
-    }, 1800);
+    const result = await generate({ prompt, systemPrompt });
+    if (result) {
+      setGeneratedContent(result.content);
+    }
   };
 
   const handleCopy = () => {
@@ -107,7 +103,7 @@ What's your take? I'd love to hear your perspective in the comments.
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">LinkedIn Generator</h1>
-            <p className="text-sm text-dark-400">Create engaging professional posts</p>
+            <p className="text-sm text-dark-400">Create engaging professional posts with AI</p>
           </div>
         </div>
       </div>
@@ -160,8 +156,14 @@ What's your take? I'd love to hear your perspective in the comments.
             disabled={!topic.trim() || isGenerating}
             className="btn-primary w-full"
           >
-            {isGenerating ? "Generating..." : "Generate LinkedIn Post"}
+            {isGenerating ? "Generating with AI..." : "Generate LinkedIn Post"}
           </button>
+
+          {error && (
+            <div className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Output Panel */}
@@ -180,7 +182,7 @@ What's your take? I'd love to hear your perspective in the comments.
             )}
           </div>
 
-          <div className="flex-1 min-h-[300px] overflow-y-auto">
+          <div className="flex-1 min-h-[300px] max-h-[600px] overflow-y-auto">
             {isGenerating ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
                 <div className="flex gap-1">
@@ -188,7 +190,7 @@ What's your take? I'd love to hear your perspective in the comments.
                   <span className="w-2 h-2 bg-sky-400 rounded-full loading-dot"></span>
                   <span className="w-2 h-2 bg-sky-400 rounded-full loading-dot"></span>
                 </div>
-                <p className="text-sm text-dark-400">Crafting your LinkedIn post...</p>
+                <p className="text-sm text-dark-400">AI is crafting your LinkedIn post...</p>
               </div>
             ) : generatedContent ? (
               <pre className="whitespace-pre-wrap text-sm text-dark-200 font-sans leading-relaxed">
@@ -197,7 +199,7 @@ What's your take? I'd love to hear your perspective in the comments.
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-sm text-dark-500">
-                  Your generated LinkedIn post will appear here
+                  Your AI-generated LinkedIn post will appear here
                 </p>
               </div>
             )}

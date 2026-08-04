@@ -25,7 +25,7 @@ const HARDCODED_CREDENTIALS = {
 
 const HARDCODED_USER: User = {
   id: "user_1",
-  name: "Alex Johnson",
+  name: "Chirag Gupta",
   email: "admin@contentforge.io",
   avatar: undefined,
 };

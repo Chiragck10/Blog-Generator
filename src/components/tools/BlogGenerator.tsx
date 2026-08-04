@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, FileText, Copy, Check, RotateCcw } from "lucide-react";
+import { useGenerate } from "@/lib/useGenerate";
 import type { ComposerState } from "@/components/dashboard/Dashboard";
 
 interface BlogGeneratorProps {
@@ -34,8 +35,8 @@ export default function BlogGenerator({ composerState, onBack }: BlogGeneratorPr
   const [tone, setTone] = useState("Professional");
   const [audience, setAudience] = useState("General");
   const [generatedContent, setGeneratedContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { generate, isGenerating, error } = useGenerate();
 
   useEffect(() => {
     if (composerState) {
@@ -45,55 +46,35 @@ export default function BlogGenerator({ composerState, onBack }: BlogGeneratorPr
     }
   }, [composerState]);
 
-  const generateContent = () => {
+  const generateContent = async () => {
     if (!topic.trim()) return;
 
-    setIsGenerating(true);
     setGeneratedContent("");
 
-    // Simulate AI generation with a realistic blog post
-    setTimeout(() => {
-      const content = `# ${topic}
+    const systemPrompt = `You are an expert blog writer. Write well-researched, comprehensive, and engaging blog posts. 
+Your writing should be:
+- Well-structured with clear headings (use markdown ## for sections)
+- Informative with specific details, data points, and examples
+- Engaging and readable
+- SEO-friendly with good keyword usage
+- Written in a ${tone.toLowerCase()} tone
+- Targeted at ${audience.toLowerCase()}
 
-## Introduction
+Include an introduction, multiple body sections with subheadings, and a conclusion. Make the content thorough (at least 600 words) and valuable to the reader.`;
 
-In today's rapidly evolving landscape, understanding ${topic.toLowerCase()} has become more critical than ever. This article explores the key aspects, current trends, and practical implications that professionals need to know.
+    const prompt = `Write a comprehensive blog post about: "${topic}"
 
-## Key Insights
+Requirements:
+- Tone: ${tone}
+- Target Audience: ${audience}
+- Include relevant examples, statistics, or case studies where appropriate
+- Use markdown formatting for structure
+- Make it engaging and informative`;
 
-The landscape of ${topic.toLowerCase()} is shaped by several important factors:
-
-1. **Innovation & Technology** — New advancements are continuously reshaping how we approach this subject. From AI-driven solutions to data-backed strategies, the tools available today are more powerful than ever.
-
-2. **Market Dynamics** — Understanding the current market conditions is essential for making informed decisions. The interplay between supply, demand, and emerging opportunities creates a complex but navigable environment.
-
-3. **Best Practices** — Industry leaders have identified several proven approaches that consistently deliver results. Adopting these practices can significantly improve outcomes.
-
-## Practical Applications
-
-When applying these concepts in real-world scenarios, consider the following approach:
-
-- **Start with research** — Gather data and insights from reliable sources before making decisions.
-- **Iterate quickly** — Don't wait for perfection. Test small changes and learn from the results.
-- **Measure outcomes** — Track key metrics to understand what's working and what needs adjustment.
-- **Stay adaptable** — The landscape changes rapidly, so flexibility is key to long-term success.
-
-## Looking Ahead
-
-As we look to the future, ${topic.toLowerCase()} will continue to evolve. Staying informed, adaptable, and proactive will be the hallmarks of those who thrive in this space.
-
-The most successful professionals will be those who combine deep expertise with a willingness to embrace new approaches and technologies.
-
-## Conclusion
-
-Understanding and leveraging ${topic.toLowerCase()} is not just an advantage — it's becoming a necessity. By staying informed and applying best practices, you can position yourself and your organization for sustained success.
-
----
-*Written with a ${tone.toLowerCase()} tone for ${audience.toLowerCase()}.*`;
-
-      setGeneratedContent(content);
-      setIsGenerating(false);
-    }, 2000);
+    const result = await generate({ prompt, systemPrompt });
+    if (result) {
+      setGeneratedContent(result.content);
+    }
   };
 
   const handleCopy = () => {
@@ -122,7 +103,7 @@ Understanding and leveraging ${topic.toLowerCase()} is not just an advantage —
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Blog Generator</h1>
-            <p className="text-sm text-dark-400">Generate comprehensive blog posts</p>
+            <p className="text-sm text-dark-400">Generate comprehensive blog posts with AI</p>
           </div>
         </div>
       </div>
@@ -137,7 +118,7 @@ Understanding and leveraging ${topic.toLowerCase()} is not just an advantage —
             <textarea
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="What should the blog post be about?"
+              placeholder="What should the blog post be about? Be specific for better results..."
               className="textarea-field min-h-[120px]"
               rows={4}
             />
@@ -175,8 +156,14 @@ Understanding and leveraging ${topic.toLowerCase()} is not just an advantage —
             disabled={!topic.trim() || isGenerating}
             className="btn-primary w-full"
           >
-            {isGenerating ? "Generating..." : "Generate Blog Post"}
+            {isGenerating ? "Generating with AI..." : "Generate Blog Post"}
           </button>
+
+          {error && (
+            <div className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Output Panel */}
@@ -195,7 +182,7 @@ Understanding and leveraging ${topic.toLowerCase()} is not just an advantage —
             )}
           </div>
 
-          <div className="flex-1 min-h-[300px] overflow-y-auto">
+          <div className="flex-1 min-h-[300px] max-h-[600px] overflow-y-auto">
             {isGenerating ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
                 <div className="flex gap-1">
@@ -203,18 +190,17 @@ Understanding and leveraging ${topic.toLowerCase()} is not just an advantage —
                   <span className="w-2 h-2 bg-brand-400 rounded-full loading-dot"></span>
                   <span className="w-2 h-2 bg-brand-400 rounded-full loading-dot"></span>
                 </div>
-                <p className="text-sm text-dark-400">Generating your blog post...</p>
+                <p className="text-sm text-dark-400">AI is researching and writing your blog post...</p>
+                <p className="text-xs text-dark-500">This may take a few seconds</p>
               </div>
             ) : generatedContent ? (
-              <div className="prose prose-invert prose-sm max-w-none">
-                <pre className="whitespace-pre-wrap text-sm text-dark-200 font-sans leading-relaxed bg-transparent border-0 p-0">
-                  {generatedContent}
-                </pre>
-              </div>
+              <pre className="whitespace-pre-wrap text-sm text-dark-200 font-sans leading-relaxed">
+                {generatedContent}
+              </pre>
             ) : (
               <div className="flex items-center justify-center h-full">
                 <p className="text-sm text-dark-500">
-                  Your generated blog post will appear here
+                  Your AI-generated blog post will appear here
                 </p>
               </div>
             )}

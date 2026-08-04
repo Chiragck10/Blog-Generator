@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Wand2, Copy, Check, RotateCcw } from "lucide-react";
+import { useGenerate } from "@/lib/useGenerate";
 import type { ComposerState } from "@/components/dashboard/Dashboard";
 
 interface PromptEnhancerProps {
@@ -12,8 +13,8 @@ interface PromptEnhancerProps {
 export default function PromptEnhancer({ composerState, onBack }: PromptEnhancerProps) {
   const [inputPrompt, setInputPrompt] = useState("");
   const [enhancedPrompt, setEnhancedPrompt] = useState("");
-  const [isEnhancing, setIsEnhancing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const { generate, isGenerating, error } = useGenerate();
 
   useEffect(() => {
     if (composerState) {
@@ -21,56 +22,29 @@ export default function PromptEnhancer({ composerState, onBack }: PromptEnhancer
     }
   }, [composerState]);
 
-  const enhancePrompt = () => {
+  const enhancePrompt = async () => {
     if (!inputPrompt.trim()) return;
 
-    setIsEnhancing(true);
     setEnhancedPrompt("");
 
-    setTimeout(() => {
-      const original = inputPrompt.trim();
+    const systemPrompt = `You are a prompt engineering expert. Your task is to take a rough, basic AI prompt and rewrite it into a clear, detailed, and highly effective prompt that will produce much better results from any AI model.
 
-      // Build an enhanced version of the prompt
-      const enhanced = `## Enhanced Prompt
+When enhancing a prompt:
+1. Preserve the user's original intent completely
+2. Add specificity — clarify what exactly is being asked
+3. Add context — define the role, background, and constraints
+4. Add structure — specify the desired output format
+5. Add quality criteria — define what "good" looks like
+6. Add guardrails — specify what to avoid
 
-### Role & Context
-You are an expert assistant specializing in the topic described below. Your responses should be thorough, well-structured, and actionable.
+Return ONLY the enhanced prompt (ready to copy-paste into any AI tool). Do not add explanations or meta-commentary about the enhancement. Just output the improved prompt directly.`;
 
-### Task
-${original}
+    const prompt = `Please enhance this AI prompt into a more effective version:\n\n"${inputPrompt}"`;
 
-### Detailed Instructions
-Please follow these guidelines when responding:
-
-1. **Scope & Focus**: Address the core request directly without unnecessary tangents. Stay focused on delivering exactly what is asked for.
-
-2. **Structure**: Organize your response with clear headings, bullet points, or numbered lists where appropriate. Make the content easy to scan and reference.
-
-3. **Depth**: Provide comprehensive coverage of the topic. Include relevant examples, data points, or analogies that strengthen understanding.
-
-4. **Tone**: Maintain a professional yet approachable tone. Avoid jargon unless the audience is technical, and define terms when first introduced.
-
-5. **Actionability**: Where applicable, include concrete next steps, recommendations, or implementation guidance that the reader can act on immediately.
-
-### Output Format
-- Start with a brief executive summary (2-3 sentences)
-- Use markdown formatting for readability
-- Include section headers for distinct topics
-- End with key takeaways or next steps
-
-### Constraints
-- Keep the response focused and relevant
-- Cite reasoning or examples to support claims
-- If assumptions are needed, state them clearly
-- Avoid generic filler content
-
----
-*Original prompt: "${original.length > 100 ? original.substring(0, 100) + "..." : original}"*
-*Enhanced with additional structure, context, and specificity to produce better AI outputs.*`;
-
-      setEnhancedPrompt(enhanced);
-      setIsEnhancing(false);
-    }, 1800);
+    const result = await generate({ prompt, systemPrompt });
+    if (result) {
+      setEnhancedPrompt(result.content);
+    }
   };
 
   const handleCopy = () => {
@@ -97,7 +71,7 @@ Please follow these guidelines when responding:
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Prompt Enhancer</h1>
-            <p className="text-sm text-dark-400">Transform rough prompts into effective instructions</p>
+            <p className="text-sm text-dark-400">Transform rough prompts into effective AI instructions</p>
           </div>
         </div>
       </div>
@@ -112,7 +86,7 @@ Please follow these guidelines when responding:
             <textarea
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
-              placeholder="Enter your rough prompt here. For example: 'write me a marketing plan for a new app' — and we'll enhance it into a detailed, structured prompt that gets better AI results."
+              placeholder={`Enter your rough prompt here. For example:\n\n"write me a marketing plan for a new app"\n\nAI will enhance it into a detailed, structured prompt that gets much better results.`}
               className="textarea-field min-h-[280px]"
               rows={10}
             />
@@ -120,11 +94,17 @@ Please follow these guidelines when responding:
 
           <button
             onClick={enhancePrompt}
-            disabled={!inputPrompt.trim() || isEnhancing}
+            disabled={!inputPrompt.trim() || isGenerating}
             className="btn-primary w-full"
           >
-            {isEnhancing ? "Enhancing..." : "Enhance Prompt"}
+            {isGenerating ? "Enhancing with AI..." : "Enhance Prompt"}
           </button>
+
+          {error && (
+            <div className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Output Panel */}
@@ -143,15 +123,15 @@ Please follow these guidelines when responding:
             )}
           </div>
 
-          <div className="flex-1 min-h-[300px] overflow-y-auto">
-            {isEnhancing ? (
+          <div className="flex-1 min-h-[300px] max-h-[600px] overflow-y-auto">
+            {isGenerating ? (
               <div className="flex flex-col items-center justify-center h-full gap-3">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-purple-400 rounded-full loading-dot"></span>
                   <span className="w-2 h-2 bg-purple-400 rounded-full loading-dot"></span>
                   <span className="w-2 h-2 bg-purple-400 rounded-full loading-dot"></span>
                 </div>
-                <p className="text-sm text-dark-400">Enhancing your prompt...</p>
+                <p className="text-sm text-dark-400">AI is enhancing your prompt...</p>
               </div>
             ) : enhancedPrompt ? (
               <pre className="whitespace-pre-wrap text-sm text-dark-200 font-sans leading-relaxed">
@@ -164,7 +144,7 @@ Please follow these guidelines when responding:
                   Your enhanced prompt will appear here.
                   <br />
                   <span className="text-dark-600">
-                    We add structure, context, and specificity.
+                    AI adds structure, context, and specificity.
                   </span>
                 </p>
               </div>

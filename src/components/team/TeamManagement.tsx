@@ -2,19 +2,19 @@
 
 import React, { useState } from "react";
 import { useWorkspace } from "@/context/WorkspaceContext";
-import { Users, UserPlus, Mail, Shield, Crown, User, X } from "lucide-react";
+import { Users, UserPlus, Mail, Shield, Crown, User, X, Trash2 } from "lucide-react";
 
 export default function TeamManagement() {
-  const { currentWorkspace, inviteMember } = useWorkspace();
+  const { currentWorkspace, inviteMember, removeMember } = useWorkspace();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inviteEmail.trim()) return;
 
-    // Check if already a member
     const exists = currentWorkspace?.members.some(
       (m) => m.email.toLowerCase() === inviteEmail.toLowerCase()
     );
@@ -27,6 +27,11 @@ export default function TeamManagement() {
       setInviteSuccess(false);
       setShowInviteModal(false);
     }, 1500);
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    removeMember(memberId);
+    setConfirmDelete(null);
   };
 
   const getRoleIcon = (role: string) => {
@@ -87,7 +92,7 @@ export default function TeamManagement() {
           {currentWorkspace?.members.map((member) => (
             <div
               key={member.id}
-              className="flex items-center gap-4 p-3 rounded-lg hover:bg-dark-800/50 transition-colors"
+              className="flex items-center gap-4 p-3 rounded-lg hover:bg-dark-800/50 transition-colors group"
             >
               {/* Avatar */}
               <div className="w-10 h-10 rounded-full bg-brand-600/20 flex items-center justify-center flex-shrink-0">
@@ -116,6 +121,17 @@ export default function TeamManagement() {
                   year: "numeric",
                 })}
               </span>
+
+              {/* Delete Button (not for owner) */}
+              {member.role !== "owner" && (
+                <button
+                  onClick={() => setConfirmDelete(member.id)}
+                  className="p-1.5 rounded-md text-dark-500 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all"
+                  title="Remove member"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -192,6 +208,37 @@ export default function TeamManagement() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Member Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="card w-full max-w-sm mx-4 animate-fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-lg bg-red-400/10 flex items-center justify-center">
+                <Trash2 className="w-4 h-4 text-red-400" />
+              </div>
+              <h2 className="text-lg font-semibold text-white">Remove Member</h2>
+            </div>
+            <p className="text-sm text-dark-300 mb-5">
+              Are you sure you want to remove this member from the workspace? They will lose access immediately.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemoveMember(confirmDelete)}
+                className="bg-red-600 hover:bg-red-700 text-white font-medium px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       )}

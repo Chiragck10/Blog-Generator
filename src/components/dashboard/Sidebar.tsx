@@ -12,6 +12,7 @@ import {
   Plus,
   Check,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import type { PageView } from "./Dashboard";
 
@@ -22,7 +23,7 @@ interface SidebarProps {
 
 export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const { user, logout } = useAuth();
-  const { workspaces, currentWorkspace, switchWorkspace, createWorkspace } = useWorkspace();
+  const { workspaces, currentWorkspace, switchWorkspace, createWorkspace, deleteWorkspace } = useWorkspace();
   const [showWorkspaceSwitcher, setShowWorkspaceSwitcher] = useState(false);
   const [showCreateWorkspace, setShowCreateWorkspace] = useState(false);
   const [newWorkspaceName, setNewWorkspaceName] = useState("");
@@ -70,22 +71,41 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                 Workspaces
               </p>
               {workspaces.map((ws) => (
-                <button
+                <div
                   key={ws.id}
-                  onClick={() => {
-                    switchWorkspace(ws.id);
-                    setShowWorkspaceSwitcher(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2 py-2 rounded-md hover:bg-dark-700 transition-colors text-left"
+                  className="flex items-center gap-1 group/ws"
                 >
-                  <div className="w-6 h-6 rounded bg-brand-600/20 flex items-center justify-center text-brand-400 text-xs font-bold">
-                    {ws.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-sm text-dark-200 flex-1 truncate">{ws.name}</span>
-                  {currentWorkspace?.id === ws.id && (
-                    <Check className="w-4 h-4 text-brand-400" />
+                  <button
+                    onClick={() => {
+                      switchWorkspace(ws.id);
+                      setShowWorkspaceSwitcher(false);
+                    }}
+                    className="flex-1 flex items-center gap-2 px-2 py-2 rounded-md hover:bg-dark-700 transition-colors text-left"
+                  >
+                    <div className="w-6 h-6 rounded bg-brand-600/20 flex items-center justify-center text-brand-400 text-xs font-bold">
+                      {ws.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm text-dark-200 flex-1 truncate">{ws.name}</span>
+                    {currentWorkspace?.id === ws.id && (
+                      <Check className="w-4 h-4 text-brand-400" />
+                    )}
+                  </button>
+                  {workspaces.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteWorkspace(ws.id);
+                        if (workspaces.length <= 2) {
+                          setShowWorkspaceSwitcher(false);
+                        }
+                      }}
+                      className="p-1 rounded text-dark-500 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover/ws:opacity-100 transition-all"
+                      title="Delete workspace"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   )}
-                </button>
+                </div>
               ))}
             </div>
 

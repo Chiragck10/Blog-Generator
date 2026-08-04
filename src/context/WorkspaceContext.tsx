@@ -24,10 +24,15 @@ interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   switchWorkspace: (id: string) => void;
   createWorkspace: (name: string) => Workspace;
+  deleteWorkspace: (id: string) => void;
   inviteMember: (email: string) => void;
+  removeMember: (memberId: string) => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
+
+// Bump this version whenever you change DEFAULT_WORKSPACES to auto-reset localStorage
+const DATA_VERSION = "2";
 
 const DEFAULT_WORKSPACES: Workspace[] = [
   {
@@ -38,22 +43,22 @@ const DEFAULT_WORKSPACES: Workspace[] = [
     members: [
       {
         id: "user_1",
-        name: "Alex Johnson",
+        name: "Chirag Gupta",
         email: "admin@contentforge.io",
         role: "owner",
         joinedAt: "2024-01-15T10:00:00Z",
       },
       {
         id: "user_2",
-        name: "Sarah Chen",
-        email: "sarah@example.com",
+        name: "Mayank",
+        email: "mayank@example.com",
         role: "admin",
         joinedAt: "2024-02-01T14:30:00Z",
       },
       {
         id: "user_3",
-        name: "Mike Peters",
-        email: "mike@example.com",
+        name: "Kashish",
+        email: "kashish@example.com",
         role: "member",
         joinedAt: "2024-03-10T09:15:00Z",
       },
@@ -66,6 +71,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
 
   useEffect(() => {
+    const storedVersion = localStorage.getItem("workspaces_version");
+
+    // If version doesn't match, reset to defaults
+    if (storedVersion !== DATA_VERSION) {
+      localStorage.setItem("workspaces", JSON.stringify(DEFAULT_WORKSPACES));
+      localStorage.setItem("current_workspace_id", DEFAULT_WORKSPACES[0].id);
+      localStorage.setItem("workspaces_version", DATA_VERSION);
+      setWorkspaces(DEFAULT_WORKSPACES);
+      setCurrentWorkspace(DEFAULT_WORKSPACES[0]);
+      return;
+    }
+
     const stored = localStorage.getItem("workspaces");
     const currentWsId = localStorage.getItem("current_workspace_id");
 
@@ -81,6 +98,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       localStorage.setItem("current_workspace_id", DEFAULT_WORKSPACES[0].id);
     }
   }, []);
+
+  const persist = (updated: Workspace[], currentId: string) => {
+    setWorkspaces(updated);
+    localStorage.setItem("workspaces", JSON.stringify(updated));
+    localStorage.setItem("current_workspace_id", currentId);
+  };
 
   const switchWorkspace = (id: string) => {
     const ws = workspaces.find((w) => w.id === id);
@@ -99,7 +122,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       members: [
         {
           id: "user_1",
-          name: "Alex Johnson",
+          name: "Chirag Gupta",
           email: "admin@contentforge.io",
           role: "owner",
           joinedAt: new Date().toISOString(),
@@ -108,11 +131,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     };
 
     const updated = [...workspaces, newWs];
-    setWorkspaces(updated);
     setCurrentWorkspace(newWs);
-    localStorage.setItem("workspaces", JSON.stringify(updated));
-    localStorage.setItem("current_workspace_id", newWs.id);
+    persist(updated, newWs.id);
     return newWs;
+  };
+
+  const deleteWorkspace = (id: string) => {
+    // Cannot delete the last workspace
+    if (workspaces.length <= 1) return;
+
+    const updated = workspaces.filter((ws) => ws.id !== id);
+    const newCurrent = currentWorkspace?.id === id ? updated[0] : currentWorkspace || updated[0];
+    setCurrentWorkspace(newCurrent);
+    persist(updated, newCurrent.id);
   };
 
   const inviteMember = (email: string) => {
@@ -135,14 +166,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ws.id === currentWorkspace.id ? updatedWorkspace : ws
     );
 
-    setWorkspaces(updatedWorkspaces);
     setCurrentWorkspace(updatedWorkspace);
-    localStorage.setItem("workspaces", JSON.stringify(updatedWorkspaces));
+    persist(updatedWorkspaces, currentWorkspace.id);
+  };
+
+  const removeMember = (memberId: string) => {
+    if (!currentWorkspace) return;
+
+    // Cannot remove the owner
+    const member = currentWorkspace.members.find((m) => m.id === memberId);
+    if (!member || member.role === "owner") return;
+
+    const updatedWorkspace = {
+      ...currentWorkspace,
+      members: currentWorkspace.members.filter((m) => m.id !== memberId),
+    };
+
+    const updatedWorkspaces = workspaces.map((ws) =>
+      ws.id === currentWorkspace.id ? updatedWorkspace : ws
+    );
+
+    setCurrentWorkspace(updatedWorkspace);
+    persist(updatedWorkspaces, currentWorkspace.id);
   };
 
   return (
     <WorkspaceContext.Provider
-      value={{ workspaces, currentWorkspace, switchWorkspace, createWorkspace, inviteMember }}
+      value={{
+        workspaces,
+        currentWorkspace,
+        switchWorkspace,
+        createWorkspace,
+        deleteWorkspace,
+        inviteMember,
+        removeMember,
+      }}
     >
       {children}
     </WorkspaceContext.Provider>
