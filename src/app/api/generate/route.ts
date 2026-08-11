@@ -8,7 +8,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, systemPrompt, model } = body;
+    const { prompt, systemPrompt, model, temperature, maxTokens } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
             content: prompt,
           },
         ],
-        max_tokens: 2000,
-        temperature: 0.7,
+        max_tokens: maxTokens || 2000,
+        temperature: temperature ?? 0.7,
       }),
     });
 
