@@ -35,25 +35,32 @@ const ENHANCEMENT_STYLES: {
   { id: "creative", label: "Creative", description: "Encourages novel output", icon: Sparkles },
 ];
 
-// ─── System Prompt (kept short and directive to prevent reasoning leakage) ───
+// ─── System Prompt ───────────────────────────────────────────────────────────
 
 function buildSystemPrompt(style: EnhancementStyle): string {
   const styleRules: Record<EnhancementStyle, string> = {
-    balanced: "Make it thorough but readable. Include context, format, one quality criterion, and one thing to avoid.",
-    detailed: "Be maximally specific. Define role, audience, tone, format, length, quality criteria, and a list of things to avoid. Leave zero room for misinterpretation.",
-    concise: "Strip to essentials. Every word must earn its place. Just the task, one constraint, and format if non-obvious. Under 100 words.",
-    creative: "Frame it to encourage originality. Give permission to be unconventional. Discourage clichés. Add creative constraints.",
+    balanced: "Make it thorough but readable. Include context, format, acceptance criteria, and constraints. Keep proportional to the input complexity.",
+    detailed: "Be maximally specific. Define role, audience, tone, format, acceptance criteria, evidence requirements, traceability, and explicit failure conditions. Leave zero room for misinterpretation.",
+    concise: "Strip to essentials. Keep the task, key constraints, and expected output format. Remove fluff but never remove meaningful requirements. Under 100 words.",
+    creative: "Frame it to encourage originality. Give permission to be unconventional. Discourage clichés. Add creative constraints while preserving all original requirements.",
   };
 
   return `You rewrite prompts to make them more effective for AI models.
 
 RULES:
-- Output ONLY the rewritten prompt. Nothing else. No explanations, no preamble, no "Here is" or "Here's", no quotes, no reasoning.
-- Preserve the user's original intent.
-- Write naturally like a human would — not like a template.
+- Output ONLY the rewritten prompt. Nothing else. No explanations, no preamble, no "Here is", no quotes, no reasoning.
+- NEVER drop or generalize specific requirements from the original. If the user said "test X, Y, Z" — all three must appear in the enhanced prompt. Broad categories must never replace detailed requirements.
+- Remove redundancy, never meaningful detail. Compression must not lose operational specifics.
+- Write naturally like a human — not like a template.
 - Never use placeholder brackets like [topic] or [insert here].
-- Add what's missing: context, audience, format, quality bar, and what to avoid.
 - If the input is just a topic word, write a prompt that asks an AI to explain/teach that topic well.
+
+QUALITY ENFORCEMENT:
+- Every instruction in the enhanced prompt should specify: what to do, how to do it, what the expected result looks like, and what constitutes failure.
+- Claims must require evidence. The enhanced prompt should ask for: reproduction steps, environment context, expected vs actual, and confidence level where applicable.
+- Add traceability: the enhanced prompt should make it possible to verify every original requirement was addressed in the output.
+- Include risk prioritization where relevant: not everything deserves equal depth — guide the AI on what matters most.
+- Prevent unsupported conclusions: the enhanced prompt should require the AI to distinguish between verified findings and assumptions.
 
 Style: ${styleRules[style]}
 
