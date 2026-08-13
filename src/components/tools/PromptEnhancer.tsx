@@ -39,43 +39,65 @@ const ENHANCEMENT_STYLES: {
 
 function buildSystemPrompt(style: EnhancementStyle): string {
   const styleRules: Record<EnhancementStyle, string> = {
-    balanced: "Output a thorough but readable prompt. Include role, context, task, format, acceptance criteria, and anti-patterns.",
-    detailed: "Output a maximally specific prompt. Include role, audience, tone, format, step-by-step process, acceptance criteria, evidence requirements, failure conditions, traceability, and anti-patterns. Leave zero room for misinterpretation.",
-    concise: "Output a tight, focused prompt. Keep only the task, essential constraints, format, and one anti-pattern. Every word must earn its place. Remove fluff but never remove meaningful requirements from the original.",
-    creative: "Output a prompt that encourages original, non-generic output. Add creative constraints, discourage clichés, give permission to be unconventional, while preserving the original intent and all requirements.",
+    balanced: `STYLE: Clean up structure, tighten language, fill only genuine gaps. Don't add sections the user didn't ask for.`,
+    detailed: `STYLE: Add missing dimensions only where genuinely absent — role, audience, format, acceptance criteria, failure conditions. If these already exist in the input, leave them as-is or just sharpen them.`,
+    concise: `STYLE: Make it shorter and tighter without losing any requirements. Remove redundancy, tighten sentences, cut filler. Never remove meaningful content.`,
+    creative: `STYLE: Reframe to encourage more original AI output. Add one creative constraint or permission. Don't change the core ask.`,
   };
 
-  return `You are an expert prompt engineer. You take a user's prompt and produce a significantly better version that will get higher-quality results from any AI model.
+  return `You are a prompt enhancer. You take a user's prompt and make it clearer and more effective — nothing more.
 
-RULES:
-1. Output ONLY the enhanced prompt. No preamble, no "Here's your enhanced prompt:", no commentary, no explanation, no quotes around it.
-2. PRESERVE the user's original intent and ALL specific requirements. Never drop, summarize, or generalize specifics.
-3. For SHORT inputs (under 50 words): expand thoughtfully — add role, context, constraints, format, acceptance criteria, anti-patterns.
-4. For LONG inputs (over 200 words): the prompt is already detailed. Your job is to STRENGTHEN it, not shorten it. Improve vague instructions, add missing acceptance criteria, add failure conditions, strengthen enforcement language ("should" → "must"), add anti-patterns, and improve structure. Output must be SIMILAR LENGTH OR LONGER than the input.
-5. NEVER just echo the input back. You must make meaningful improvements.
-6. Write naturally — not like a rigid template or form.
+ABSOLUTE RULES:
 
-WHAT MAKES A GREAT PROMPT:
-- Clear role/persona (when it helps)
-- Specific task definition
-- Context that shapes quality
-- Format/structure expectations
-- Acceptance criteria (what "good" looks like)
-- Failure conditions (what to avoid, what NOT to do)
-- Evidence requirements (where applicable)
-- Anti-patterns (specific things that would make the output bad)
+1. Output ONLY the enhanced prompt. No commentary, no preamble, no explanations.
 
-STYLE: ${styleRules[style]}`;
+2. DO NOT ADD YOUR OWN IDEAS, SUGGESTIONS, OR REQUIREMENTS.
+   You are not a consultant. You do not invent new requirements. You do not add sections the user didn't ask for. You do not suggest approaches, methodologies, or frameworks unless the user's intent clearly calls for them.
+
+3. RESPECT WHAT'S ALREADY THERE.
+   If the prompt already has acceptance criteria — don't add more.
+   If the prompt already has anti-patterns — don't add more.
+   If the prompt already has structure — preserve it.
+   If the prompt is already good — make only minor improvements (tighten language, fix ambiguity, improve flow).
+
+4. YOUR JOB IS:
+   - Fix vague/weak language → make it precise
+   - Fix ambiguity → make intent unmistakable
+   - Fix structure → improve readability and flow
+   - Fill GENUINE gaps only → if there's truly no format specified and it matters, add it. If there's truly no audience defined and it matters, add it. But don't add things for the sake of adding them.
+   - Strengthen enforcement → "try to" → "must", "should consider" → "include"
+
+5. YOUR JOB IS NOT:
+   - Adding unrelated requirements
+   - Inventing new sections or categories
+   - Making the prompt longer for the sake of it
+   - Suggesting tools, methods, or approaches the user didn't ask about
+   - Adding examples the user didn't request
+   - Padding with generic "best practices"
+
+6. PROPORTIONAL ENHANCEMENT:
+   - If the input is 5 words → expand significantly (the user needs help)
+   - If the input is 50 words → moderate improvement (add missing clarity)
+   - If the input is 200+ words → minimal, surgical improvement (the user knows what they want — just tighten it)
+
+7. A WELL-WRITTEN INPUT NEEDS MINIMAL CHANGES.
+   Not every prompt needs heavy enhancement. If the user wrote a clear, detailed, well-structured prompt — your output should be very close to their input with only language tightening and minor gap-filling. Don't force changes.
+
+${styleRules[style]}`;
 }
 
 function buildUserMessage(inputPrompt: string): string {
   const wordCount = inputPrompt.trim().split(/\s+/).length;
 
-  if (wordCount > 200) {
-    return `Enhance and strengthen this detailed prompt. It is already long — do NOT shorten or summarize it. Preserve every section and requirement. Add what's missing: acceptance criteria, failure conditions, anti-patterns, evidence requirements. Strengthen vague language. The output must be at least as long as the input.\n\nOriginal prompt:\n\n${inputPrompt.trim()}`;
+  if (wordCount > 150) {
+    return `This prompt is already detailed. Only tighten language, fix ambiguity, and improve structure. Do NOT add new requirements or suggestions. Keep the same length:\n\n${inputPrompt.trim()}`;
   }
 
-  return `Enhance this prompt:\n\n${inputPrompt.trim()}`;
+  if (wordCount > 50) {
+    return `Enhance this prompt — fix ambiguity, tighten language, add only what's genuinely missing:\n\n${inputPrompt.trim()}`;
+  }
+
+  return `Turn this into a clear, effective prompt:\n\n${inputPrompt.trim()}`;
 }
 
 // ─── Output Cleaning ─────────────────────────────────────────────────────────
