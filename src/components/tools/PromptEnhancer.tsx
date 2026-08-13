@@ -39,92 +39,72 @@ const ENHANCEMENT_STYLES: {
 
 function buildSystemPrompt(style: EnhancementStyle): string {
   const styleRules: Record<EnhancementStyle, string> = {
-    balanced: "Make it thorough but readable. Include context, format, acceptance criteria, and constraints. Keep proportional to the input complexity.",
-    detailed: "Be maximally specific. Define role, audience, tone, format, acceptance criteria, evidence requirements, traceability, and explicit failure conditions. Leave zero room for misinterpretation.",
-    concise: "Strip to essentials. Keep the task, key constraints, and expected output format. Remove fluff but never remove meaningful requirements. Under 100 words.",
-    creative: "Frame it to encourage originality. Give permission to be unconventional. Discourage clichés. Add creative constraints while preserving all original requirements.",
+    balanced: "Output a thorough but readable prompt. Include role, context, task, format, acceptance criteria, and anti-patterns.",
+    detailed: "Output a maximally specific prompt. Include role, audience, tone, format, step-by-step process, acceptance criteria, evidence requirements, failure conditions, traceability, and anti-patterns. Leave zero room for misinterpretation.",
+    concise: "Output a tight, focused prompt. Keep only the task, essential constraints, format, and one anti-pattern. Every word must earn its place. Remove fluff but never remove meaningful requirements from the original.",
+    creative: "Output a prompt that encourages original, non-generic output. Add creative constraints, discourage clichés, give permission to be unconventional, while preserving the original intent and all requirements.",
   };
 
-  return `You rewrite prompts to make them more effective for AI models.
+  return `You are an expert prompt engineer. You take a user's prompt and produce a significantly better version that will get higher-quality results from any AI model.
 
 RULES:
-- Output ONLY the rewritten prompt. Nothing else. No explanations, no preamble, no "Here is", no quotes, no reasoning.
-- NEVER drop or generalize specific requirements from the original. If the user said "test X, Y, Z" — all three must appear in the enhanced prompt. Broad categories must never replace detailed requirements.
-- Remove redundancy, never meaningful detail. Compression must not lose operational specifics.
-- Write naturally like a human — not like a template.
-- Never use placeholder brackets like [topic] or [insert here].
-- If the input is just a topic word, write a prompt that asks an AI to explain/teach that topic well.
+1. Output ONLY the enhanced prompt. No preamble, no "Here's your enhanced prompt:", no commentary, no explanation, no quotes around it.
+2. PRESERVE the user's original intent and ALL specific requirements. Never drop, summarize, or generalize specifics.
+3. For SHORT inputs (under 50 words): expand thoughtfully — add role, context, constraints, format, acceptance criteria, anti-patterns.
+4. For LONG inputs (over 200 words): the prompt is already detailed. Your job is to STRENGTHEN it, not shorten it. Improve vague instructions, add missing acceptance criteria, add failure conditions, strengthen enforcement language ("should" → "must"), add anti-patterns, and improve structure. Output must be SIMILAR LENGTH OR LONGER than the input.
+5. NEVER just echo the input back. You must make meaningful improvements.
+6. Write naturally — not like a rigid template or form.
 
-QUALITY ENFORCEMENT:
-- Every instruction in the enhanced prompt should specify: what to do, how to do it, what the expected result looks like, and what constitutes failure.
-- Claims must require evidence. The enhanced prompt should ask for: reproduction steps, environment context, expected vs actual, and confidence level where applicable.
-- Add traceability: the enhanced prompt should make it possible to verify every original requirement was addressed in the output.
-- Include risk prioritization where relevant: not everything deserves equal depth — guide the AI on what matters most.
-- Prevent unsupported conclusions: the enhanced prompt should require the AI to distinguish between verified findings and assumptions.
+WHAT MAKES A GREAT PROMPT:
+- Clear role/persona (when it helps)
+- Specific task definition
+- Context that shapes quality
+- Format/structure expectations
+- Acceptance criteria (what "good" looks like)
+- Failure conditions (what to avoid, what NOT to do)
+- Evidence requirements (where applicable)
+- Anti-patterns (specific things that would make the output bad)
 
-Style: ${styleRules[style]}
-
-IMPORTANT: Your entire response must be the enhanced prompt and nothing else.`;
+STYLE: ${styleRules[style]}`;
 }
 
 function buildUserMessage(inputPrompt: string): string {
-  return `Rewrite this into a better prompt:\n\n${inputPrompt.trim()}`;
+  const wordCount = inputPrompt.trim().split(/\s+/).length;
+
+  if (wordCount > 200) {
+    return `Enhance and strengthen this detailed prompt. It is already long — do NOT shorten or summarize it. Preserve every section and requirement. Add what's missing: acceptance criteria, failure conditions, anti-patterns, evidence requirements. Strengthen vague language. The output must be at least as long as the input.\n\nOriginal prompt:\n\n${inputPrompt.trim()}`;
+  }
+
+  return `Enhance this prompt:\n\n${inputPrompt.trim()}`;
 }
 
-// ─── Output Cleaning (strips reasoning/meta that leaks through) ──────────────
+// ─── Output Cleaning ─────────────────────────────────────────────────────────
 
 function cleanOutput(output: string): string {
   let cleaned = output.trim();
 
-  // Remove common AI preambles and meta-commentary
   const preamblePatterns = [
     /^here['']?s?\s*(your|the|my|an?)?\s*(enhanced|improved|refined|rewritten|better)\s*(prompt|version)\s*:?\s*/i,
     /^(enhanced|improved|rewritten|better)\s*(prompt|version)\s*:?\s*/i,
-    /^(sure|certainly|absolutely|of course)[!,.]?\s*(here['']?s?\s*(your|the|an?)?\s*(enhanced|improved)?\s*(prompt|version)?:?\s*)?/i,
-    /^(okay|ok)[!,.]?\s*/i,
+    /^(sure|certainly|absolutely|of course|okay|ok)[!,.]?\s*(here['']?s?[^.]*)?/i,
   ];
 
   for (const pattern of preamblePatterns) {
     cleaned = cleaned.replace(pattern, "");
   }
 
-  // Remove wrapping quotes
   if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
     cleaned = cleaned.slice(1, -1).trim();
   }
 
-  // Remove markdown code blocks
   if (cleaned.startsWith("```")) {
     cleaned = cleaned.replace(/^```\w*\n?/, "").replace(/\n?```$/, "").trim();
-  }
-
-  // Remove trailing meta-commentary / reasoning
-  const trailingPatterns = [
-    /\n---\n[\s\S]*$/,
-    /\n\*{1,3}(Note|Explanation|Reasoning|Why|Changes|What I did|Analysis):?[\s\S]*$/i,
-    /\n(This enhanced|I['']ve (enhanced|improved|added)|The above|This prompt|This rewrite)[\s\S]*$/i,
-    /\n(We need|They likely|The original|Since they|Must follow|Probably they)[\s\S]*$/i,
-    /\n(INTENT|DOMAIN|GAPS|RISK|FIX):[\s\S]*$/i,
-  ];
-
-  for (const pattern of trailingPatterns) {
-    cleaned = cleaned.replace(pattern, "");
-  }
-
-  // Remove leading reasoning that got prepended
-  const leadingReasoningPatterns = [
-    /^(The user|They want|We need|Since|Likely|Probably|The original|Must|Let me|I'll|I will|Looking at|Analyzing)[\s\S]*?\n\n/i,
-    /^(INTENT|DOMAIN|GAPS|RISK|FIX):[\s\S]*?\n\n/i,
-  ];
-
-  for (const pattern of leadingReasoningPatterns) {
-    cleaned = cleaned.replace(pattern, "");
   }
 
   return cleaned.trim();
 }
 
-// ─── Input Validation ────────────────────────────────────────────────────────
+// ─── Validation ──────────────────────────────────────────────────────────────
 
 function validateInput(input: string): { valid: boolean; warning?: string } {
   const trimmed = input.trim();
@@ -174,10 +154,10 @@ export default function PromptEnhancer({ composerState, onBack }: PromptEnhancer
     if (!ol.includes("audience") && (el.includes("audience") || el.includes("reader"))) checks.push("Defined audience");
     if (!ol.includes("format") && (el.includes("format") || el.includes("structure"))) checks.push("Specified format");
     if (!ol.includes("avoid") && (el.includes("avoid") || el.includes("do not") || el.includes("don't"))) checks.push("Added guardrails");
-    if (el.includes("example") || el.includes("such as") || el.includes("e.g.")) checks.push("Included examples");
-    if (enhanced.split(/\s+/).length > original.split(/\s+/).length * 1.5) checks.push("Expanded specificity");
-    if (el.includes("step") || el.includes("first") || el.includes("then")) checks.push("Added structure");
-    if (el.includes("concise") || el.includes("brief") || el.includes("words")) checks.push("Set length constraints");
+    if (el.includes("acceptance") || el.includes("criteria")) checks.push("Acceptance criteria");
+    if (el.includes("fail") || el.includes("failure")) checks.push("Failure conditions");
+    if (el.includes("evidence") || el.includes("verif")) checks.push("Evidence requirements");
+    if (enhanced.split(/\s+/).length > original.split(/\s+/).length * 1.3) checks.push("Expanded specificity");
 
     if (checks.length === 0) checks.push("Clarified intent and precision");
     return checks.slice(0, 5);
@@ -190,14 +170,19 @@ export default function PromptEnhancer({ composerState, onBack }: PromptEnhancer
     setEnhancedPrompt("");
     setImprovements([]);
 
+    const wordCount = inputPrompt.trim().split(/\s+/).length;
     const systemPrompt = buildSystemPrompt(style);
     const prompt = buildUserMessage(inputPrompt);
+
+    // Scale tokens for long inputs
+    const baseTokens = style === "detailed" ? 4000 : style === "concise" ? 1000 : 3000;
+    const tokens = wordCount > 200 ? Math.max(baseTokens, 8000) : baseTokens;
 
     const result = await generate({
       prompt,
       systemPrompt,
-      temperature: style === "creative" ? 0.8 : style === "concise" ? 0.5 : 0.6,
-      maxTokens: style === "detailed" ? 1500 : style === "concise" ? 400 : 1000,
+      temperature: style === "creative" ? 0.9 : style === "concise" ? 0.4 : 0.7,
+      maxTokens: tokens,
     });
 
     if (result) {
@@ -378,7 +363,6 @@ export default function PromptEnhancer({ composerState, onBack }: PromptEnhancer
                   {enhancedPrompt}
                 </pre>
 
-                {/* Word count comparison */}
                 <div className="pt-4 border-t border-dark-700">
                   <div className="flex items-center gap-4 text-xs text-dark-500">
                     <span>Original: {inputPrompt.trim().split(/\s+/).length} words</span>

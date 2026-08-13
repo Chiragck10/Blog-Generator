@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash"];
 
-// Use environment variable or fallback to a free-tier key
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+function getGeminiUrl(model: string) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, systemPrompt, model, temperature, maxTokens } = body;
+    const { prompt, systemPrompt, temperature, maxTokens } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -17,50 +19,66 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!OPENROUTER_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return NextResponse.json(
-        { error: "OpenRouter API key is not configured. Please set OPENROUTER_API_KEY in your .env.local file." },
+        { error: "Gemini API key is not configured. Please set GEMINI_API_KEY in your .env.local file." },
         { status: 500 }
       );
     }
 
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "http://localhost:3000",
-        "X-Title": "ContentForge",
-      },
-      body: JSON.stringify({
-        model: model || "openrouter/free",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt || "You are a helpful content generation assistant.",
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        max_tokens: maxTokens || 2000,
+    // Build request body for Gemini API
+    const requestBody: Record<string, unknown> = {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
         temperature: temperature ?? 0.7,
-      }),
-    });
+        maxOutputTokens: maxTokens || 2000,
+      },
+    };
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: errorData.error?.message || `OpenRouter API error: ${response.status}` },
-        { status: response.status }
-      );
+    if (systemPrompt) {
+      requestBody.systemInstruction = {
+        parts: [{ text: systemPrompt }],
+      };
     }
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "No content generated.";
+    // Try models in order — fallback if one is overloaded or unavailable
+    let lastError = "";
+    for (const model of GEMINI_MODELS) {
+      const response = await fetch(`${getGeminiUrl(model)}?key=${GEMINI_API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
 
-    return NextResponse.json({ content, model: data.model });
+      if (response.ok) {
+        const data = await response.json();
+        const content =
+          data.candidates?.[0]?.content?.parts?.[0]?.text || "No content generated.";
+        return NextResponse.json({ content, model });
+      }
+
+      const errorData = await response.json().catch(() => ({}));
+      lastError = errorData.error?.message || `Gemini API error: ${response.status}`;
+
+      // If it's a rate limit / overload error, try next model
+      if (response.status === 429 || response.status === 503) {
+        continue;
+      }
+
+      // For other errors (auth, bad request), don't retry
+      return NextResponse.json({ error: lastError }, { status: response.status });
+    }
+
+    // All models failed
+    return NextResponse.json(
+      { error: lastError || "All models are currently overloaded. Please try again in a minute." },
+      { status: 503 }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
